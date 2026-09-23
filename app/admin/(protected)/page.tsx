@@ -1,7 +1,9 @@
+import { connection } from 'next/server';
 import Link from 'next/link';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
 export default async function AdminDashboard() {
+  await connection();
   const db = createSupabaseAdminClient();
   const [{ count: pc }, { count: sc }, { count: vc }] = await Promise.all([
     db.from('products').select('*', { count: 'exact', head: true }),

@@ -1,3 +1,4 @@
+import { connection } from 'next/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Viewer3D from '@/components/Viewer3D';
@@ -14,6 +15,7 @@ async function getProduct(slug: string): Promise<Product | null> {
 }
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  await connection();
   const { slug } = await params;
   const product = await getProduct(slug);
   if (!product) notFound();

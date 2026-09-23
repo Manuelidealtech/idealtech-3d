@@ -1,14 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { assertSupabasePublicConfig } from '@/lib/config';
+import { getSupabasePublicKey, getSupabaseUrl } from '@/lib/config';
 
 export async function createSupabaseServerClient() {
-  assertSupabasePublicConfig();
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    getSupabaseUrl(),
+    getSupabasePublicKey(),
     {
       cookies: {
         getAll() {
@@ -18,10 +17,10 @@ export async function createSupabaseServerClient() {
           try {
             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
           } catch {
-            // Some Server Components cannot write cookies. Route Handlers perform auth writes.
+            // Server Components cannot always write cookies. Auth Route Handlers do it instead.
           }
         },
       },
-    }
+    },
   );
 }

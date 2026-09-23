@@ -1,6 +1,8 @@
+import { connection } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
 export default async function AnalyticsPage(){
+  await connection();
   const db=createSupabaseAdminClient();
   const {count}=await db.from('view_events').select('*',{count:'exact',head:true});
   const total=count||0;

@@ -1,3 +1,4 @@
+import { connection } from 'next/server';
 import { notFound } from 'next/navigation';
 import Viewer3D from '@/components/Viewer3D';
 import { Logo } from '@/components/Logo';
@@ -6,6 +7,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import type { Product, ShareLink } from '@/lib/types';
 
 export default async function SharedPage({ params }: { params: Promise<{ token: string }> }) {
+  await connection();
   const { token } = await params;
   const db = createSupabaseAdminClient();
   const { data } = await db.from('share_links').select('*, product:products(*)').eq('token', token).eq('active', true).maybeSingle();

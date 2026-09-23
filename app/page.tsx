@@ -1,3 +1,4 @@
+import { connection } from 'next/server';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
@@ -11,6 +12,7 @@ async function getProducts(): Promise<Product[]> {
 }
 
 export default async function Home() {
+  await connection();
   const products = await getProducts();
   return (
     <main className="publicPage">
