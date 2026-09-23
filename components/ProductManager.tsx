@@ -33,8 +33,12 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
         onUploadProgress: ({ percentage }) => setMessage(`Caricamento ${Math.round(percentage)}%`),
       });
       const r = await fetch(`/api/products/${product.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model_url: blob.url, model_path: blob.pathname }) });
-      if (!r.ok) throw new Error('Aggiornamento prodotto non riuscito');
-      location.reload();
+      const updated = await r.json();
+      if (!r.ok) throw new Error(updated.error || 'Il file è stato caricato su Blob ma non è stato associato al prodotto.');
+      if (!updated.model_url) throw new Error('Upload completato, ma Supabase non ha restituito model_url. Riprova o verifica i log.');
+      setProducts(current => current.map(item => item.id === product.id ? updated : item));
+      setMessage('GLB caricato e associato al prodotto. Viewer 3D e realtà aumentata sono pronti.');
+      setBusy(false);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Errore upload');
       setBusy(false);
@@ -44,6 +48,7 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
   return <>
     <div className="adminTop"><div><span className="eyebrow">CATALOGO</span><h1>Prodotti 3D</h1><p>Gestisci dati, pubblicazione e file GLB.</p></div><button className="primaryBtn" onClick={() => setEditing({} as Product)}>+ Nuovo prodotto</button></div>
     {message && <div className="setupNotice compact"><strong>Info</strong><p>{message}</p></div>}
+    <div className="setupNotice compact"><strong>Realtà aumentata 1:1</strong><p>I GLB vengono usati anche in AR. Per dimensioni reali il file deve rispettare lo standard glTF: 1 unità = 1 metro. Verifica la scala CAD prima dell’esportazione.</p></div>
     <div className="adminPanel tablePanel"><div className="productRows">
       {products.map(p => <div className="productRow" key={p.id}><div className="rowIcon">3D</div><div className="rowMain"><small>{p.category}</small><strong>{p.name}</strong><span>/p/{p.slug}</span></div><div className="rowStatus"><span className={p.published ? 'statusOn' : 'statusOff'}>{p.published ? 'Pubblicato' : 'Bozza'}</span><span>{p.model_url ? 'GLB caricato' : 'Nessun GLB'}</span></div><div className="rowActions"><label className="ghostBtn uploadBtn">Carica GLB<input type="file" accept=".glb,model/gltf-binary" disabled={busy} onChange={e => { const f=e.target.files?.[0]; if (f) uploadModel(p,f); }} /></label><button className="ghostBtn" onClick={() => setEditing(p)}>Modifica</button><a className="ghostBtn" target="_blank" href={`/p/${p.slug}`}>Apri ↗</a></div></div>)}
     </div></div>

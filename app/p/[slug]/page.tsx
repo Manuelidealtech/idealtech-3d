@@ -24,7 +24,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       <TrackView productId={product.id} />
       <header className="experienceHeader"><Link href="/"><Logo /></Link><div><span>{product.category}</span><strong>{product.name}</strong></div></header>
       <section className="experienceBody">
-        <div className="experienceCopy"><div className="eyebrow">3D PRODUCT VIEWER</div><h1>{product.name}</h1><p>{product.description}</p><div className="featureList"><span>360° interattivo</span><span>Zoom di precisione</span><span>Nessun software richiesto</span></div></div>
+        <div className="experienceCopy"><div className="eyebrow">3D PRODUCT VIEWER</div><h1>{product.name}</h1><p>{product.description}</p><div className="featureList"><span>360° interattivo</span><span>Realtà aumentata in scala 1:1</span><span>Posizionamento sul pavimento con fotocamera</span><span>Nessun software richiesto</span></div></div>
         <div className="viewerCard"><Viewer3D modelUrl={product.model_url} productName={product.name} /></div>
       </section>
       <div className="experienceFooter"><span>IDEALTECH · PRODUCT EXPERIENCE</span><Link href="/">← Torna al catalogo</Link></div>

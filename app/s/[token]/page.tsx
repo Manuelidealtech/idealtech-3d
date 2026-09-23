@@ -19,7 +19,7 @@ export default async function SharedPage({ params }: { params: Promise<{ token: 
       <TrackView productId={share.product.id} shareId={share.id} />
       <header className="experienceHeader"><Logo /><div><span>PRIVATE PRESENTATION</span><strong>{share.product.name}</strong></div></header>
       <section className="experienceBody">
-        <div className="experienceCopy"><div className="eyebrow">IDEALTECH 3D EXPERIENCE</div><h1>{share.product.name}</h1><p>{share.product.description}</p>{share.expires_at && <div className="expiryBadge">Link valido fino al {new Date(share.expires_at).toLocaleDateString('it-IT')}</div>}</div>
+        <div className="experienceCopy"><div className="eyebrow">IDEALTECH 3D EXPERIENCE</div><h1>{share.product.name}</h1><p>{share.product.description}</p><div className="featureList"><span>360° interattivo</span><span>Realtà aumentata in scala 1:1</span><span>Apri da smartphone e posiziona il modello nello spazio reale</span></div>{share.expires_at && <div className="expiryBadge">Link valido fino al {new Date(share.expires_at).toLocaleDateString('it-IT')}</div>}</div>
         <div className="viewerCard"><Viewer3D modelUrl={share.product.model_url} productName={share.product.name} /></div>
       </section>
     </main>

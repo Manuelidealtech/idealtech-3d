@@ -23,3 +23,7 @@ Apri `http://localhost:3000`. Il progetto usa esclusivamente il backend reale: c
 ## Setup produzione
 
 Segui `SETUP-PASSO-PASSO.md`.
+
+## Realtà aumentata
+
+La versione 1.1 integra `<model-viewer>` con AR WebXR / Scene Viewer / Quick Look. I modelli GLB vengono posizionati sul pavimento in scala reale 1:1 (`ar-scale="fixed"`). Perché la scala sia corretta, il GLB deve rispettare lo standard glTF: 1 unità = 1 metro. Vedi `AGGIORNAMENTO-AR.md`.
