@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { uploadPresigned } from '@vercel/blob/client';
 import type { Product } from '@/lib/types';
+import { normalizeGlbMillimetersToMeters } from '@/lib/glb-units';
 
 export default function ProductManager({ initialProducts }: { initialProducts: Product[] }) {
   const [products, setProducts] = useState(initialProducts);
   const [editing, setEditing] = useState<Product | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [sourceUnits, setSourceUnits] = useState<'mm' | 'm'>('mm');
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,7 +28,9 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
   async function uploadModel(product: Product, file: File) {
     setBusy(true); setMessage('Caricamento in corso…');
     try {
-      const blob = await uploadPresigned(`models/${product.slug}/${file.name}`, file, {
+      setMessage(sourceUnits === 'mm' ? 'Normalizzazione millimetri → metri…' : 'Preparazione GLB…');
+      const uploadFile = sourceUnits === 'mm' ? await normalizeGlbMillimetersToMeters(file) : file;
+      const blob = await uploadPresigned(`models/${product.slug}/${uploadFile.name}`, uploadFile, {
         access: 'public',
         handleUploadUrl: '/api/blob/upload',
         multipart: true,
@@ -37,7 +41,7 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
       if (!r.ok) throw new Error(updated.error || 'Il file è stato caricato su Blob ma non è stato associato al prodotto.');
       if (!updated.model_url) throw new Error('Upload completato, ma Supabase non ha restituito model_url. Riprova o verifica i log.');
       setProducts(current => current.map(item => item.id === product.id ? updated : item));
-      setMessage('GLB caricato e associato al prodotto. Viewer 3D e realtà aumentata sono pronti.');
+      setMessage(sourceUnits === 'mm' ? 'GLB normalizzato mm → m, caricato e associato. AR 1:1 pronta.' : 'GLB caricato e associato al prodotto. AR 1:1 pronta.');
       setBusy(false);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Errore upload');
@@ -48,7 +52,7 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
   return <>
     <div className="adminTop"><div><span className="eyebrow">CATALOGO</span><h1>Prodotti 3D</h1><p>Gestisci dati, pubblicazione e file GLB.</p></div><button className="primaryBtn" onClick={() => setEditing({} as Product)}>+ Nuovo prodotto</button></div>
     {message && <div className="setupNotice compact"><strong>Info</strong><p>{message}</p></div>}
-    <div className="setupNotice compact"><strong>Realtà aumentata 1:1</strong><p>I GLB vengono usati anche in AR. Per dimensioni reali il file deve rispettare lo standard glTF: 1 unità = 1 metro. Verifica la scala CAD prima dell’esportazione.</p></div>
+    <div className="setupNotice compact unitSetup"><div><strong>Unità dei GLB caricati</strong><p>Per i file derivati dagli STL Idealtech lascia <b>Millimetri (CAD/STL)</b>: il portale incorpora automaticamente la conversione 0,001 nel GLB, così anche Scene Viewer e Quick Look ricevono dimensioni reali.</p></div><label>Unità sorgente<select value={sourceUnits} onChange={e => setSourceUnits(e.target.value as 'mm' | 'm')} disabled={busy}><option value="mm">Millimetri (CAD/STL) — consigliato</option><option value="m">Metri (GLB già corretto)</option></select></label></div>
     <div className="adminPanel tablePanel"><div className="productRows">
       {products.map(p => <div className="productRow" key={p.id}><div className="rowIcon">3D</div><div className="rowMain"><small>{p.category}</small><strong>{p.name}</strong><span>/p/{p.slug}</span></div><div className="rowStatus"><span className={p.published ? 'statusOn' : 'statusOff'}>{p.published ? 'Pubblicato' : 'Bozza'}</span><span>{p.model_url ? 'GLB caricato' : 'Nessun GLB'}</span></div><div className="rowActions"><label className="ghostBtn uploadBtn">Carica GLB<input type="file" accept=".glb,model/gltf-binary" disabled={busy} onChange={e => { const f=e.target.files?.[0]; if (f) uploadModel(p,f); }} /></label><button className="ghostBtn" onClick={() => setEditing(p)}>Modifica</button><a className="ghostBtn" target="_blank" href={`/p/${p.slug}`}>Apri ↗</a></div></div>)}
     </div></div>

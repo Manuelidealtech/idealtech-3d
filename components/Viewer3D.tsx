@@ -27,6 +27,7 @@ export default function Viewer3D({ modelUrl, productName }: { modelUrl: string |
   const [dimensions, setDimensions] = useState<Dimensions | null>(null);
   const [arSupported, setArSupported] = useState<boolean | null>(null);
   const [arMessage, setArMessage] = useState<string | null>(null);
+  const [scaleWarning, setScaleWarning] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -52,12 +53,22 @@ export default function Viewer3D({ modelUrl, productName }: { modelUrl: string |
     setError(null);
     setDimensions(null);
     setArMessage(null);
+    setScaleWarning(null);
 
     const updateModelInfo = () => {
       try {
         const dims = viewer.getDimensions?.();
         if (dims && Number.isFinite(dims.x) && Number.isFinite(dims.y) && Number.isFinite(dims.z)) {
-          setDimensions({ x: dims.x, y: dims.y, z: dims.z });
+          const measured = { x: dims.x, y: dims.y, z: dims.z };
+          setDimensions(measured);
+          const maxDimension = Math.max(measured.x, measured.y, measured.z);
+          if (maxDimension > 100) {
+            setScaleWarning('Scala GLB anomala per la realtà aumentata. Ricarica il file dall’admin selezionando “Millimetri (CAD/STL)”.');
+          } else if (maxDimension > 0 && maxDimension < 0.02) {
+            setScaleWarning('Il modello risulta molto piccolo. Controlla che il GLB sia espresso in metri.');
+          } else {
+            setScaleWarning(null);
+          }
         }
       } catch (err) {
         console.warn('Dimensioni modello non disponibili', err);
@@ -132,7 +143,9 @@ export default function Viewer3D({ modelUrl, productName }: { modelUrl: string |
     src: modelUrl,
     alt: `Modello 3D ${productName}`,
     ar: true,
-    'ar-modes': 'webxr scene-viewer quick-look',
+    // Native AR first: Scene Viewer / Quick Look give a more stable product-placement UX.
+    // WebXR remains as fallback for compatible devices.
+    'ar-modes': 'scene-viewer quick-look webxr',
     'ar-scale': 'fixed',
     'ar-placement': 'floor',
     'camera-controls': true,
@@ -172,7 +185,7 @@ export default function Viewer3D({ modelUrl, productName }: { modelUrl: string |
 
           <div className="viewerBottomBar">
             <div className="viewerHint">Trascina per ruotare · pizzica/rotella per zoom</div>
-            {arSupported ? (
+            {arSupported && !scaleWarning ? (
               <button type="button" className="arLaunchButton" onClick={openAR}>
                 <span className="arCameraIcon" aria-hidden="true">◎</span>
                 <span><small>REALTÀ AUMENTATA</small>Visualizza nel tuo spazio</span>
@@ -180,12 +193,12 @@ export default function Viewer3D({ modelUrl, productName }: { modelUrl: string |
             ) : (
               <div className="arUnavailableHint">
                 <strong>AR</strong>
-                <span>Apri da smartphone compatibile</span>
+                <span>{scaleWarning ? 'Scala non valida per AR' : 'Apri da smartphone compatibile'}</span>
               </div>
             )}
           </div>
 
-          {arMessage && <div className="arMessage">{arMessage}</div>}
+          {(arMessage || scaleWarning) && <div className="arMessage">{arMessage || scaleWarning}</div>}
         </>
       )}
     </div>
