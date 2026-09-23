@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
-  const db = createSupabaseAdminClient();
-  if (!db) return NextResponse.json({ ok: true, demo: true });
   try {
+    const db = createSupabaseAdminClient();
     const { productId, shareId } = await request.json();
     if (!productId) return NextResponse.json({ ok: false }, { status: 400 });
     await db.from('view_events').insert({
@@ -13,6 +12,9 @@ export async function POST(request: Request) {
       user_agent: request.headers.get('user-agent'),
       referrer: request.headers.get('referer'),
     });
-  } catch {}
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch {
+    // Analytics must never block the viewer.
+    return NextResponse.json({ ok: false }, { status: 200 });
+  }
 }

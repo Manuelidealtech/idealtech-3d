@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Apri http://localhost:3000. Prima di configurare servizi esterni funziona in modalità demo.
+Apri http://localhost:3000. La versione definitiva non include una modalità demo: Supabase e Vercel Blob devono essere configurati.
 
 ## 3. Crea progetto Supabase
 
@@ -47,7 +47,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://TUO-PROGETTO.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=LA_TUA_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=LA_TUA_SERVICE_ROLE_KEY
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-BLOB_READ_WRITE_TOKEN=
+BLOB_STORE_ID (gestito automaticamente da Vercel OIDC)=
 ```
 
 Riavvia `npm run dev`. Ora `/admin` richiede login reale.

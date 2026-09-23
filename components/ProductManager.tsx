@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import type { Product } from '@/lib/types';
 
-export default function ProductManager({ initialProducts, demo }: { initialProducts: Product[]; demo: boolean }) {
+export default function ProductManager({ initialProducts }: { initialProducts: Product[] }) {
   const [products, setProducts] = useState(initialProducts);
   const [editing, setEditing] = useState<Product | null>(null);
   const [busy, setBusy] = useState(false);
@@ -12,7 +12,6 @@ export default function ProductManager({ initialProducts, demo }: { initialProdu
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (demo) { setMessage('Configura Supabase per salvare modifiche reali.'); return; }
     setBusy(true); setMessage('');
     const fd = new FormData(e.currentTarget);
     const payload = Object.fromEntries(fd.entries());
@@ -25,7 +24,6 @@ export default function ProductManager({ initialProducts, demo }: { initialProdu
   }
 
   async function uploadModel(product: Product, file: File) {
-    if (demo) { setMessage('Configura Vercel Blob e Supabase per caricare modelli.'); return; }
     setBusy(true); setMessage('Caricamento in corso…');
     try {
       const blob = await upload(`models/${product.slug}/${file.name}`, file, {

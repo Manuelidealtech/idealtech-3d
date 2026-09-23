@@ -8,7 +8,6 @@ import type { Product, ShareLink } from '@/lib/types';
 export default async function SharedPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const db = createSupabaseAdminClient();
-  if (!db) notFound();
   const { data } = await db.from('share_links').select('*, product:products(*)').eq('token', token).eq('active', true).maybeSingle();
   const share = data as (ShareLink & { product: Product | null }) | null;
   if (!share?.product) notFound();

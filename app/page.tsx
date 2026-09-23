@@ -1,15 +1,12 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
-import { demoProducts } from '@/lib/demo';
-import { isSupabaseConfigured } from '@/lib/config';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import type { Product } from '@/lib/types';
 
 async function getProducts(): Promise<Product[]> {
-  if (!isSupabaseConfigured) return demoProducts;
   const db = createSupabaseAdminClient();
-  if (!db) return [];
-  const { data } = await db.from('products').select('*').eq('published', true).order('name');
+  const { data, error } = await db.from('products').select('*').eq('published', true).order('name');
+  if (error) throw new Error(`Impossibile caricare il catalogo: ${error.message}`);
   return (data || []) as Product[];
 }
 
@@ -25,16 +22,15 @@ export default async function Home() {
       </section>
       <section className="catalogSection">
         <div className="sectionHeading"><div><span>CATALOGO 3D</span><h2>Prodotti disponibili</h2></div><p>{products.length} modelli</p></div>
-        <div className="productGrid">
+        {products.length === 0 ? <div className="emptyCatalog">Nessun prodotto pubblicato.</div> : <div className="productGrid">
           {products.map((product, index) => (
             <Link href={`/p/${product.slug}`} className="productCard" key={product.id}>
               <div className="productVisual"><div className="wireMachine"><i></i><i></i><i></i></div><span>{String(index + 1).padStart(2, '0')}</span></div>
               <div className="productMeta"><small>{product.category}</small><h3>{product.name}</h3><p>{product.description}</p><b>Apri esperienza 3D →</b></div>
             </Link>
           ))}
-        </div>
+        </div>}
       </section>
-      {!isSupabaseConfigured && <div className="demoBanner">Modalità demo: configura Supabase per attivare il portale reale.</div>}
       <footer>© {new Date().getFullYear()} Idealtech · 3D Experience</footer>
     </main>
   );

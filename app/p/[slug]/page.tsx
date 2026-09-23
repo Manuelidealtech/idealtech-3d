@@ -3,16 +3,13 @@ import Link from 'next/link';
 import Viewer3D from '@/components/Viewer3D';
 import { Logo } from '@/components/Logo';
 import { TrackView } from '@/components/TrackView';
-import { demoProducts } from '@/lib/demo';
-import { isSupabaseConfigured } from '@/lib/config';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import type { Product } from '@/lib/types';
 
 async function getProduct(slug: string): Promise<Product | null> {
-  if (!isSupabaseConfigured) return demoProducts.find(p => p.slug === slug) || null;
   const db = createSupabaseAdminClient();
-  if (!db) return null;
-  const { data } = await db.from('products').select('*').eq('slug', slug).eq('published', true).maybeSingle();
+  const { data, error } = await db.from('products').select('*').eq('slug', slug).eq('published', true).maybeSingle();
+  if (error) throw new Error(`Impossibile caricare il prodotto: ${error.message}`);
   return data as Product | null;
 }
 

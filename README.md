@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Apri `http://localhost:3000`. Senza `.env.local` il progetto parte in **modalità demo**: puoi già vedere catalogo, viewer e dashboard.
+Apri `http://localhost:3000`. Il progetto usa esclusivamente il backend reale: configura Supabase prima di avviare le funzioni amministrative.
 
 ## Stack
 
