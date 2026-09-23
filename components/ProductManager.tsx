@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { upload } from '@vercel/blob/client';
+import { uploadPresigned } from '@vercel/blob/client';
 import type { Product } from '@/lib/types';
 
 export default function ProductManager({ initialProducts }: { initialProducts: Product[] }) {
@@ -26,7 +26,7 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
   async function uploadModel(product: Product, file: File) {
     setBusy(true); setMessage('Caricamento in corso…');
     try {
-      const blob = await upload(`models/${product.slug}/${file.name}`, file, {
+      const blob = await uploadPresigned(`models/${product.slug}/${file.name}`, file, {
         access: 'public',
         handleUploadUrl: '/api/blob/upload',
         multipart: true,
