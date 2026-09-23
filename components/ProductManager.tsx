@@ -8,6 +8,32 @@ import { scaleGlbToRealSize } from '@/lib/glb-units';
 type Dims = { x: number; y: number; z: number };
 type PendingUpload = { product: Product; file: File; measured: Dims };
 
+
+function parseLocalizedNumber(value: string): number {
+  let s = String(value ?? '').trim().replace(/[\s\u00A0']/g, '');
+  if (!s) return NaN;
+
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    // The last separator is the decimal separator; the other one is grouping.
+    if (lastComma > lastDot) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  } else if (lastComma >= 0) {
+    // Italian decimal comma (1723,69).
+    s = s.replace(/,/g, '.');
+  } else if ((s.match(/\./g) || []).length > 1) {
+    // Multiple dots are most likely grouping separators (1.723.690).
+    s = s.replace(/\./g, '');
+  }
+
+  return Number(s);
+}
+
 function fmt(n: number) {
   return n >= 10 ? n.toFixed(2) : n.toFixed(3);
 }
@@ -53,6 +79,8 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState<PendingUpload | null>(null);
   const [realDims, setRealDims] = useState<[string, string, string]>(['', '', '']);
+  const [calibrationError, setCalibrationError] = useState('');
+  const [calibrationStatus, setCalibrationStatus] = useState('');
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -74,6 +102,8 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
       const measured = await measureGlb(file);
       setPending({ product, file, measured });
       setRealDims(['', '', '']);
+      setCalibrationError('');
+      setCalibrationStatus('');
       setMessage('');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Impossibile analizzare il GLB.');
@@ -85,13 +115,15 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
   async function uploadCalibrated(mode: 'calibrate' | 'already-correct') {
     if (!pending) return;
     setBusy(true);
+    setCalibrationError('');
+    setCalibrationStatus('');
     try {
       let uploadFile = pending.file;
       let factor = 1;
       let realMm: [number, number, number] | undefined;
 
       if (mode === 'calibrate') {
-        const parsed = realDims.map(v => Number(String(v).replace(',', '.'))) as [number, number, number];
+        const parsed = realDims.map(parseLocalizedNumber) as [number, number, number];
         if (parsed.some(v => !Number.isFinite(v) || v <= 0)) {
           throw new Error('Inserisci tutte e tre le dimensioni reali in millimetri.');
         }
@@ -102,9 +134,11 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
           throw new Error('Le dimensioni inserite non sono proporzionali al GLB (scostamento oltre 8%). Verifica le tre misure reali.');
         }
         factor = result.factor;
+        setCalibrationStatus(`Calibrazione scala × ${factor.toPrecision(6)}…`);
         setMessage(`Calibrazione scala × ${factor.toPrecision(6)}…`);
         uploadFile = await scaleGlbToRealSize(pending.file, factor, parsed);
       } else {
+        setCalibrationStatus('Preparazione GLB…');
         setMessage('Preparazione GLB…');
       }
 
@@ -112,7 +146,11 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
         access: 'public',
         handleUploadUrl: '/api/blob/upload',
         multipart: true,
-        onUploadProgress: ({ percentage }) => setMessage(`Caricamento ${Math.round(percentage)}%`),
+        onUploadProgress: ({ percentage }) => {
+          const text = `Caricamento ${Math.round(percentage)}%`;
+          setCalibrationStatus(text);
+          setMessage(text);
+        },
       });
 
       const r = await fetch(`/api/products/${pending.product.id}`, {
@@ -126,11 +164,15 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
 
       setProducts(current => current.map(item => item.id === pending.product.id ? updated : item));
       setPending(null);
+      setCalibrationStatus('');
       setMessage(mode === 'calibrate'
         ? `GLB calibrato sulle dimensioni reali e caricato. Fattore applicato: ×${factor.toPrecision(6)}. AR 1:1 pronta.`
         : 'GLB caricato senza correzione: dimensioni dichiarate già in metri.');
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Errore upload');
+      const text = err instanceof Error ? err.message : 'Errore upload';
+      setCalibrationError(text);
+      setCalibrationStatus('');
+      setMessage(text);
     } finally {
       setBusy(false);
     }
@@ -150,13 +192,15 @@ export default function ProductManager({ initialProducts }: { initialProducts: P
       <div className="realDimsGrid">
         {(['A','B','C'] as const).map((label, i) => <label key={label}>Misura {label} (mm)<input inputMode="decimal" placeholder={i===0?'es. 3424':i===1?'es. 5479':'es. 5602'} value={realDims[i]} onChange={e => setRealDims(prev => { const next=[...prev] as [string,string,string]; next[i]=e.target.value; return next; })}/></label>)}
       </div>
-      {realDims.every(v => Number(String(v).replace(',','.')) > 0) && (() => {
-        const values = realDims.map(v => Number(String(v).replace(',','.'))) as [number,number,number];
+      {realDims.every(v => parseLocalizedNumber(v) > 0) && (() => {
+        const values = realDims.map(parseLocalizedNumber) as [number,number,number];
         const result = calibrationFactor(pending.measured, values);
         const target = values.map(v=>v/1000).sort((a,b)=>a-b);
         return <div className={result.maxDeviation <= .08 ? 'calibrationPreview ok' : 'calibrationPreview warn'}><strong>{result.maxDeviation <= .08 ? 'Calibrazione valida' : 'Controlla le misure'}</strong><span>Scala calcolata ×{result.factor.toPrecision(6)} · Ingombro finale ≈ {target.map(v=>`${v.toFixed(3)} m`).join(' × ')}</span></div>;
       })()}
-    </div><div className="modalActions calibrationActions"><button type="button" className="ghostBtn" disabled={busy} onClick={()=>uploadCalibrated('already-correct')}>GLB già corretto in metri</button><button type="button" className="primaryBtn" disabled={busy} onClick={()=>uploadCalibrated('calibrate')}>Calibra e carica</button></div></div></div>}
+      {calibrationError && <div className="calibrationInlineError"><strong>Impossibile procedere</strong><span>{calibrationError}</span></div>}
+      {busy && calibrationStatus && <div className="calibrationProgress"><span className="calibrationSpinner" aria-hidden="true"/><span>{calibrationStatus}</span></div>}
+    </div><div className="modalActions calibrationActions"><button type="button" className="ghostBtn" disabled={busy} onClick={()=>uploadCalibrated('already-correct')}>GLB già corretto in metri</button><button type="button" className="primaryBtn" disabled={busy} onClick={()=>uploadCalibrated('calibrate')}>{busy ? 'Attendi…' : 'Calibra e carica'}</button></div></div></div>}
 
     {editing && <div className="modalBackdrop" onMouseDown={() => setEditing(null)}><div className="modal" onMouseDown={e=>e.stopPropagation()}><div className="modalHead"><div><small>PRODOTTO 3D</small><h2>{editing.id ? 'Modifica prodotto' : 'Nuovo prodotto'}</h2></div><button onClick={()=>setEditing(null)}>×</button></div><form onSubmit={save} className="editForm"><label>Nome<input name="name" required defaultValue={editing.name || ''}/></label><label>Slug URL<input name="slug" required defaultValue={editing.slug || ''} placeholder="idm-gp"/></label><label>Categoria<input name="category" required defaultValue={editing.category || 'Sistemi'}/></label><label className="wide">Descrizione<textarea name="description" rows={4} defaultValue={editing.description || ''}/></label><label className="checkLabel wide"><input name="published" type="checkbox" value="true" defaultChecked={editing.published ?? true}/> Pubblica nel catalogo</label><div className="modalActions"><button type="button" className="ghostBtn" onClick={()=>setEditing(null)}>Annulla</button><button className="primaryBtn" disabled={busy}>Salva prodotto</button></div></form></div></div>}
   </>;
