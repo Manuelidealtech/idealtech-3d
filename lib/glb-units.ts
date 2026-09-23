@@ -1,8 +1,7 @@
 const GLB_MAGIC = 0x46546c67;
 const GLB_VERSION = 2;
 const JSON_CHUNK_TYPE = 0x4e4f534a;
-const MM_TO_M = 0.001;
-const NORMALIZER_NODE_NAME = 'IDEALTECH_MM_TO_M_NORMALIZER';
+const CALIBRATION_NODE_NAME = 'IDEALTECH_REAL_SIZE_CALIBRATION';
 
 type GlbChunk = {
   type: number;
@@ -14,12 +13,25 @@ function paddedLength(length: number) {
 }
 
 /**
- * glTF uses metres. CAD/STL workflows commonly keep vertex coordinates in mm.
- * This function wraps every glTF scene in a 0.001 root transform without
- * touching meshes, textures or binary buffers. The resulting GLB is therefore
- * natively correct for Scene Viewer / Quick Look as well as the web viewer.
+ * Bakes a uniform real-size correction into the GLB scene graph without
+ * touching mesh buffers, materials or textures. This is important because
+ * native AR viewers (Scene Viewer / Quick Look) receive the GLB itself.
+ *
+ * `scaleFactor` is relative to the dimensions currently reported by the GLB.
+ * Example: GLB reports 56 m but real machine is 5.6 m -> factor 0.1.
  */
-export async function normalizeGlbMillimetersToMeters(file: File): Promise<File> {
+export async function scaleGlbToRealSize(
+  file: File,
+  scaleFactor: number,
+  realDimensionsMm?: [number, number, number],
+): Promise<File> {
+  if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) {
+    throw new Error('Fattore di scala non valido.');
+  }
+
+  // No rewrite necessary if the model is already correctly scaled.
+  if (Math.abs(scaleFactor - 1) < 0.000001) return file;
+
   const source = await file.arrayBuffer();
   const view = new DataView(source);
 
@@ -53,7 +65,6 @@ export async function normalizeGlbMillimetersToMeters(file: File): Promise<File>
   const decoder = new TextDecoder();
   const rawJson = decoder.decode(chunks[jsonIndex].bytes).replace(/[\u0000\u0020]+$/g, '');
   const gltf = JSON.parse(rawJson) as {
-    asset?: Record<string, unknown>;
     nodes?: Array<Record<string, unknown>>;
     scenes?: Array<{ nodes?: number[]; [key: string]: unknown }>;
     extras?: Record<string, unknown>;
@@ -62,34 +73,30 @@ export async function normalizeGlbMillimetersToMeters(file: File): Promise<File>
   gltf.nodes = Array.isArray(gltf.nodes) ? gltf.nodes : [];
   gltf.scenes = Array.isArray(gltf.scenes) ? gltf.scenes : [];
 
-  // Avoid multiplying the scale if a previously-normalized GLB is uploaded again.
-  const alreadyNormalized = gltf.nodes.some(node => node?.name === NORMALIZER_NODE_NAME);
-  if (!alreadyNormalized) {
-    for (const scene of gltf.scenes) {
-      const roots = Array.isArray(scene.nodes) ? [...scene.nodes] : [];
-      if (!roots.length) continue;
-      const wrapperIndex = gltf.nodes.length;
-      gltf.nodes.push({
-        name: NORMALIZER_NODE_NAME,
-        scale: [MM_TO_M, MM_TO_M, MM_TO_M],
-        children: roots,
-      });
-      scene.nodes = [wrapperIndex];
-    }
+  for (const scene of gltf.scenes) {
+    const roots = Array.isArray(scene.nodes) ? [...scene.nodes] : [];
+    if (!roots.length) continue;
+    const wrapperIndex = gltf.nodes.length;
+    gltf.nodes.push({
+      name: CALIBRATION_NODE_NAME,
+      scale: [scaleFactor, scaleFactor, scaleFactor],
+      children: roots,
+    });
+    scene.nodes = [wrapperIndex];
   }
 
   gltf.extras = {
     ...(gltf.extras || {}),
-    idealtechSourceUnits: 'mm',
-    idealtechGlbUnits: 'm',
-    idealtechUnitScale: MM_TO_M,
+    idealtechRealSizeCalibrated: true,
+    idealtechAppliedScaleFactor: scaleFactor,
+    ...(realDimensionsMm ? { idealtechRealDimensionsMm: realDimensionsMm } : {}),
   };
 
   const encoder = new TextEncoder();
   const jsonBytes = encoder.encode(JSON.stringify(gltf));
   const jsonPaddedLength = paddedLength(jsonBytes.length);
   const normalizedJson = new Uint8Array(jsonPaddedLength);
-  normalizedJson.fill(0x20); // JSON GLB padding must be spaces.
+  normalizedJson.fill(0x20);
   normalizedJson.set(jsonBytes);
   chunks[jsonIndex] = { type: JSON_CHUNK_TYPE, bytes: normalizedJson };
 
@@ -107,10 +114,13 @@ export async function normalizeGlbMillimetersToMeters(file: File): Promise<File>
     out.setUint32(writeOffset + 4, chunk.type, true);
     const target = new Uint8Array(result, writeOffset + 8, length);
     target.set(chunk.bytes);
-    // BIN chunks conventionally use zero padding, JSON was already padded with spaces.
     writeOffset += 8 + length;
   }
 
-  const outputName = file.name.replace(/\.glb$/i, '') + '.glb';
-  return new File([result], outputName, { type: 'model/gltf-binary', lastModified: Date.now() });
+  return new File([result], file.name, { type: 'model/gltf-binary', lastModified: Date.now() });
+}
+
+// Kept for compatibility with any older imports.
+export async function normalizeGlbMillimetersToMeters(file: File): Promise<File> {
+  return scaleGlbToRealSize(file, 0.001);
 }
